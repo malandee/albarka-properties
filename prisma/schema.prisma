@@ -1,0 +1,287 @@
+// Albarka Properties Consultant Ltd. - PostgreSQL schema
+// Migrations live in prisma/migrations and are applied with `npx prisma migrate deploy`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ListingPurpose {
+  FOR_SALE
+  FOR_RENT
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  RENTED
+}
+
+enum Visibility {
+  PUBLIC
+  HIDDEN
+}
+
+enum AccountTokenPurpose {
+  SETUP
+  RESET
+}
+
+enum EnquiryStatus {
+  NEW
+  REVIEWED
+  CLOSED
+}
+
+/// Administrator and Super Admin accounts. Email doubles as the login username.
+model User {
+  id                String        @id @default(cuid())
+  name              String        @db.VarChar(120)
+  email             String        @unique @db.VarChar(254)
+  phone             String?       @db.VarChar(32)
+  passwordHash      String?       @db.VarChar(255)
+  role              Role          @default(ADMIN)
+  status            AccountStatus @default(ACTIVE)
+  failedLoginCount  Int           @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  lastActivityAt    DateTime?
+  createdById       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+
+  sessions          Session[]
+  accountTokens     AccountToken[]
+  properties        Property[]          @relation("PropertyOwner")
+  statusChanges     PropertyStatusHistory[] @relation("StatusChangedBy")
+  auditActions      AuditLog[]
+
+  @@index([role, status])
+  @@index([deletedAt])
+}
+
+/// Server-managed session. Only a SHA-256 hash of the random token is stored.
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique @db.VarChar(64)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  userAgent   String?  @db.VarChar(255)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// One-time setup (invitation) and reset tokens. Only hashes are stored.
+model AccountToken {
+  id          String               @id @default(cuid())
+  userId      String
+  tokenHash   String               @unique @db.VarChar(64)
+  purpose     AccountTokenPurpose
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdAt   DateTime             @default(now())
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+/// Controlled list of property types (House, Duplex, ...). Managed by the Super Admin.
+model PropertyCategory {
+  id        String    @id @default(cuid())
+  slug      String    @unique @db.VarChar(80)
+  name      String    @unique @db.VarChar(80)
+  sortOrder Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  properties Property[]
+}
+
+/// Controlled amenity / feature catalogue (Fenced compound, Water supply, ...).
+model Feature {
+  id        String   @id @default(cuid())
+  slug      String   @unique @db.VarChar(80)
+  label     String   @unique @db.VarChar(80)
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  properties PropertyFeature[]
+}
+
+model Property {
+  id                 String              @id @default(cuid())
+  slug               String              @unique @db.VarChar(140)
+  title              String              @db.VarChar(160)
+  shortDescription   String              @db.VarChar(280)
+  description        String              @db.Text
+  purpose            ListingPurpose
+  categoryId         String
+  priceAmount        Decimal?            @db.Decimal(16, 2)
+  priceOnRequest     Boolean             @default(false)
+  currency           String              @default("NGN") @db.VarChar(3)
+  priceNote          String?             @db.VarChar(160)
+  addressLine        String              @db.VarChar(255)
+  area               String?             @db.VarChar(120)
+  city               String              @db.VarChar(120)
+  state              String              @db.VarChar(120)
+  country            String              @default("Nigeria") @db.VarChar(80)
+  latitude           Decimal?            @db.Decimal(9, 6)
+  longitude          Decimal?            @db.Decimal(9, 6)
+  formattedAddress   String?             @db.VarChar(400)
+  mapIsPrivate       Boolean             @default(false)
+  bedrooms           Int?
+  bathrooms          Int?
+  toilets            Int?
+  parkingSpaces      Int?
+  floors             Int?
+  landSizeSqm        Decimal?            @db.Decimal(12, 2)
+  buildingSizeSqm    Decimal?            @db.Decimal(12, 2)
+  availabilityStatus AvailabilityStatus  @default(AVAILABLE)
+  visibility         Visibility          @default(HIDDEN)
+  isDemo             Boolean             @default(false)
+  ownerId            String
+  publishedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  category           PropertyCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  owner              User                @relation("PropertyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  images             PropertyImage[]
+  features           PropertyFeature[]
+  statusHistory      PropertyStatusHistory[]
+  enquiries          ContactEnquiry[]
+
+  @@index([visibility, purpose, availabilityStatus])
+  @@index([ownerId, updatedAt])
+  @@index([state, city])
+  @@index([priceAmount])
+  @@index([createdAt])
+  @@index([categoryId])
+}
+
+/// Gallery images. Files are stored in media storage under storageKey; never in the database.
+model PropertyImage {
+  id          String   @id @default(cuid())
+  propertyId  String
+  storageKey  String   @unique @db.VarChar(160)
+  altText     String   @db.VarChar(200)
+  sortOrder   Int      @default(0)
+  // At most one featured image per property is enforced by a partial unique index (see migration).
+  isFeatured  Boolean  @default(false)
+  width       Int
+  height      Int
+  bytes       Int
+  createdAt   DateTime @default(now())
+
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, sortOrder])
+}
+
+/// Normalised many-to-many join for property features.
+model PropertyFeature {
+  propertyId String
+  featureId  String
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  feature    Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, featureId])
+  @@index([featureId])
+}
+
+model PropertyStatusHistory {
+  id                String              @id @default(cuid())
+  propertyId        String
+  changedById       String?
+  fromStatus        AvailabilityStatus?
+  toStatus          AvailabilityStatus?
+  fromVisibility    Visibility?
+  toVisibility      Visibility?
+  createdAt         DateTime            @default(now())
+
+  property          Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  changedBy         User?               @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, createdAt])
+}
+
+/// Append-only record of significant administrative actions. Never stores passwords or tokens.
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  action      String   @db.VarChar(64)
+  entityType  String   @db.VarChar(40)
+  entityId    String?  @db.VarChar(64)
+  summary     String   @db.VarChar(300)
+  ipHash      String?  @db.VarChar(64)
+  createdAt   DateTime @default(now())
+
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+/// Key/value site settings (Super Admin managed). Values are validated by the settings service.
+model SiteSetting {
+  key        String   @id @db.VarChar(80)
+  value      String   @db.VarChar(1000)
+  updatedById String?
+  updatedAt  DateTime @updatedAt
+}
+
+/// Contact enquiries from the public Contact page. Stored only after successful insert.
+model ContactEnquiry {
+  id           String        @id @default(cuid())
+  name         String        @db.VarChar(120)
+  email        String?       @db.VarChar(254)
+  phone        String?       @db.VarChar(32)
+  subject      String        @db.VarChar(80)
+  message      String        @db.VarChar(2000)
+  propertyId   String?
+  propertyRef  String?       @db.VarChar(160)
+  status       EnquiryStatus @default(NEW)
+  ipHash       String?       @db.VarChar(64)
+  createdAt    DateTime      @default(now())
+
+  property     Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+/// Fixed-window rate-limit counters, shared across server instances.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  bucket    String   @db.VarChar(200)
+  createdAt DateTime @default(now())
+
+  @@index([bucket, createdAt])
+}

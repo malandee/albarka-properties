@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 6rem;
+  }
+  body {
+    @apply bg-neutral-bg font-sans text-neutral-text antialiased;
+    font-size: 1rem;
+    line-height: 1.65;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4 {
+    @apply text-brand-ink;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-white;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  .prose-width {
+    @apply max-w-prose;
+  }
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-[0.9375rem] font-semibold transition-colors duration-200 ease-std disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-brand-deep text-white hover:bg-brand-charcoal;
+  }
+  .btn-secondary {
+    @apply btn border border-neutral-border bg-white text-brand-ink hover:border-brand-deep hover:text-brand-deep;
+  }
+  .btn-ghost {
+    @apply btn text-brand-deep hover:bg-neutral-alt;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-[#8F1B12];
+  }
+  .input {
+    @apply block min-h-11 w-full rounded-md border border-neutral-border bg-white px-3 py-2 text-[0.9375rem] text-neutral-text placeholder:text-neutral-muted focus:border-brand-deep focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:bg-neutral-alt;
+  }
+  .input-invalid {
+    @apply border-danger focus:border-danger focus:ring-danger/30;
+  }
+  .card {
+    @apply rounded-lg border border-neutral-border bg-white shadow-card;
+  }
+  .eyebrow {
+    @apply text-support font-semibold uppercase tracking-[0.08em] text-brand-deep;
+  }
+}
+
+@layer utilities {
+  .sr-only-focusable:focus {
+    @apply not-sr-only;
+  }
+}
+
+/* Motion: honour the user's reduced-motion preference everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Leaflet container defaults adjusted to the design system. */
+.leaflet-container {
+  font-family: inherit;
+  border-radius: 8px;
+}
+.skeleton {
+  background: linear-gradient(90deg, #eef2f3 25%, #e1e8ea 37%, #eef2f3 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
