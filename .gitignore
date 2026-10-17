@@ -1,0 +1,27 @@
+# Secrets: never commit real environment files (.env.example is kept)
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.turbo/
+.vercel/
+
+# Local uploads and generated media (production uses object storage)
+storage/
+
+# Logs and editor/OS noise
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+
+# TypeScript build cache
+*.tsbuildinfo
