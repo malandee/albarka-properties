@@ -15,7 +15,6 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
 };
 
-export const revalidate = 300;
 
 export default async function HomePage() {
   const featuredCount = await getFeaturedCount();
