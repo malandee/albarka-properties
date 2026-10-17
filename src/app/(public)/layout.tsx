@@ -4,8 +4,12 @@ import { getEnv } from '@/lib/env';
 import { getPublicContact } from '@/lib/contact/public-contact';
 import { publicPhones } from '@/lib/contact/rules';
 
-/** Public pages refresh within five minutes of a contact change. Saving in Settings also purges them at once. */
-export const revalidate = 300;
+/**
+ * Public pages are rendered per request. They read the database (contact details, featured listings),
+ * which is not available while a host such as Amplify builds the site. Rendering at request time
+ * also means Settings changes show immediately.
+ */
+export const dynamic = 'force-dynamic';
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const contact = await getPublicContact();
