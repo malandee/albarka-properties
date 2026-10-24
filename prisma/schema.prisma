@@ -2,13 +2,14 @@
 // Migrations live in prisma/migrations and are applied with `npx prisma migrate deploy`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // rhel-openssl-3.0.x: Amplify SSR runs on Amazon Linux (Lambda) with OpenSSL 3.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("postgresql://albarka_prod_owner:npg_4OYlpyQ0VAhv@ep-soft-water-b9lzay12-pooler.c-7.eu-central-1.aws.neon.tech/albarka_prod?sslmode=require&channel_binding=require")
-  directUrl = env("postgresql://albarka_prod_owner:npg_4OYlpyQ0VAhv@ep-soft-water-b9lzay12.c-7.eu-central-1.aws.neon.tech/albarka_prod?sslmode=require&channel_binding=require")
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
